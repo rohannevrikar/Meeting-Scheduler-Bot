@@ -13545,11 +13545,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\BotFramework\\BotBuilder-Samples\\samples\\csharp_dotnetcore\\46.teams-auth\\TeamsAuth.csproj",
+      "projectUniqueName": "D:\\MeetingSchedulerBot\\Meeting-Scheduler-Bot\\TeamsAuth.csproj",
       "projectName": "TeamsAuth",
-      "projectPath": "D:\\BotFramework\\BotBuilder-Samples\\samples\\csharp_dotnetcore\\46.teams-auth\\TeamsAuth.csproj",
+      "projectPath": "D:\\MeetingSchedulerBot\\Meeting-Scheduler-Bot\\TeamsAuth.csproj",
       "packagesPath": "C:\\Users\\RohanNevrikar\\.nuget\\packages\\",
-      "outputPath": "D:\\BotFramework\\BotBuilder-Samples\\samples\\csharp_dotnetcore\\46.teams-auth\\obj\\",
+      "outputPath": "D:\\MeetingSchedulerBot\\Meeting-Scheduler-Bot\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
