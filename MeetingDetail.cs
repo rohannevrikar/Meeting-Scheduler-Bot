@@ -17,6 +17,8 @@ namespace TeamsAuth
             PartitionKey = userEmail;
             RowKey = userEmail;
         }
+        public string Title { get; set; }
+        public string TimeSlotChoice { get; set; }
 
         public string Attendees { get; set; }
         public string StartDateTime { get; set; }
