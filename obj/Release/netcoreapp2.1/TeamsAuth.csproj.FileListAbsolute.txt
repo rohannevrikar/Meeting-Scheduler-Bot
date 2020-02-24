@@ -1,0 +1,15 @@
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\bin\Release\netcoreapp2.1\TeamsAuth.deps.json
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\bin\Release\netcoreapp2.1\TeamsAuth.runtimeconfig.json
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\bin\Release\netcoreapp2.1\TeamsAuth.runtimeconfig.dev.json
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\bin\Release\netcoreapp2.1\TeamsAuth.dll
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\bin\Release\netcoreapp2.1\TeamsAuth.pdb
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.csprojAssemblyReference.cache
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.csproj.CoreCompileInputs.cache
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.RazorAssemblyInfo.cache
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.RazorAssemblyInfo.cs
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\UserSecretsAssemblyInfo.cs
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.AssemblyInfoInputs.cache
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.AssemblyInfo.cs
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.RazorTargetAssemblyInfo.cache
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.dll
+D:\BotFramework\BotBuilder-Samples\samples\csharp_dotnetcore\46.teams-auth\obj\Release\netcoreapp2.1\TeamsAuth.pdb
