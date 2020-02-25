@@ -52,10 +52,10 @@ namespace Microsoft.BotBuilderSamples
                 AskForAttendees,
                 GetTokenWithTextResultAsync,
                 AskForDuration,
-                ConfirmDetails,
                 GetTokenAsync,
                 ShowMeetingTimeSuggestions,
                 AskForTitle,
+                AskForDescription,
                 GetTokenWithTextResultAsync,
                 SendMeetingInvite
             }));
@@ -65,30 +65,24 @@ namespace Microsoft.BotBuilderSamples
             
         }
 
-        private async Task<DialogTurnResult> PromptStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        #region Bot flow methods
+        private async Task<DialogTurnResult> GetTokenWithTextResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-         
-            return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
-        }
-        private async Task<DialogTurnResult> GetTokenAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            var result = (bool)stepContext.Result;
-            if (result)
+            var result = (string)stepContext.Result;
+            if (result != null)
             {
+                stepContext.Context.TurnState.Add("data", result);
                 return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
             }
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
 
 
         }
-      
-        private async Task<DialogTurnResult> GetTokenWithTextResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> PromptStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            var result = (string)stepContext.Result;
-
-            stepContext.Context.TurnState.Add("data", result);
+         
             return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
-
         }
         private async Task<DialogTurnResult> AskForAttendees(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
@@ -99,7 +93,7 @@ namespace Microsoft.BotBuilderSamples
             {
                 // Pull in the data from the Microsoft Graph.
                 var client = new SimpleGraphClient(tokenResponse.Token);
-                var me = await client.GetMeAsync();            
+                var me = await client.GetMeAsync();
                 userEmail = me.UserPrincipalName;
                 table = CreateTableAsync("botdata");
                 MeetingDetail meetingDetail = new MeetingDetail(me.UserPrincipalName);
@@ -108,10 +102,153 @@ namespace Microsoft.BotBuilderSamples
                 return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("With whom would you like to set up a meeting?") }, cancellationToken);
             }
 
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text("Login was not successful please try again."), cancellationToken);
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
         }
-        public  CloudTable CreateTableAsync(string tableName)
+        private async Task<DialogTurnResult> AskForDuration(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            string result = (string)stepContext.Context.TurnState["data"];
+
+            var tokenResponse = (TokenResponse)stepContext.Result;
+            if (tokenResponse?.Token != null)
+            {
+                var client = new SimpleGraphClient(tokenResponse.Token);
+                List<string> attendeeEmails = await client.GetAttendeesEmails(result);
+
+                var sb = new System.Text.StringBuilder();
+                foreach (string email in attendeeEmails)
+                {
+                    sb.Append(email + ",");
+                }
+                string finalString = sb.ToString().Remove(sb.Length - 1);
+                if (attendeeEmails != null)
+                {
+                    MeetingDetail meetingDetail = new MeetingDetail(userEmail);
+                    meetingDetail.Attendees = finalString;
+
+                    await InsertOrMergeEntityAsync(table, meetingDetail);
+
+                    return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("What will be duration of the meeting? (in hours)") }, cancellationToken);
+                }
+                await stepContext.Context.SendActivityAsync("Attendee not found, please type 'hi' to start again");
+            }
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
+
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+        private async Task<DialogTurnResult> GetTokenAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var result = (string)stepContext.Result;
+            if (result != null)
+            {
+                MeetingDetail meetingDetail = new MeetingDetail(userEmail);
+                meetingDetail.Duration = result;
+
+                await InsertOrMergeEntityAsync(table, meetingDetail);
+                return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
+            }
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+
+        }
+
+        private async Task<DialogTurnResult> ShowMeetingTimeSuggestions(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var tokenResponse = (TokenResponse)stepContext.Result;
+            if (tokenResponse?.Token != null)
+            {
+                // Pull in the data from the Microsoft Graph.
+                var client = new SimpleGraphClient(tokenResponse.Token);
+                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
+                if (meetingDetail == null)
+                {
+                    await stepContext.Context.SendActivityAsync("meeting details null");
+                }
+                timeSuggestions = await client.GetFindMeetingTimes(meetingDetail.Attendees, Convert.ToDouble(meetingDetail.Duration));
+                if (timeSuggestions.Count == 0)
+                {
+                    await stepContext.Context.SendActivityAsync("No appropriate meeting slot found. Please try again by typing 'hi' and change date this time");
+                    return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+
+                }
+                var cardOptions = new List<Choice>();
+                for (int i = 0; i < timeSuggestions.Count; i++)
+                {
+                    cardOptions.Add(new Choice() { Value = timeSuggestions[i].Start.DateTime + " - " + timeSuggestions[i].End.DateTime });
+                }
+                var options = new PromptOptions()
+                {
+                    Prompt = MessageFactory.Text("These are the time suggestions"),
+                    RetryPrompt = MessageFactory.Text("Please choose an appropriate option"),
+                    Choices = cardOptions,
+                };
+
+                return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
+
+            }
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+
+        private async Task<DialogTurnResult> AskForTitle(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var result = (FoundChoice)stepContext.Result;
+           
+            if (result != null)
+            {
+                MeetingDetail meetingDetail = new MeetingDetail(userEmail);
+                meetingDetail.TimeSlotChoice = result.Index.ToString();
+
+                await InsertOrMergeEntityAsync(table, meetingDetail);
+
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter title of the meeting")}, cancellationToken);
+
+            }
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
+
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+        private async Task<DialogTurnResult> AskForDescription(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            var result = (string)stepContext.Result;
+
+            if (result != null)
+            {
+                MeetingDetail meetingDetail = new MeetingDetail(userEmail);
+                meetingDetail.Title = result;
+
+                await InsertOrMergeEntityAsync(table, meetingDetail);
+
+                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter description of the meeting") }, cancellationToken);
+
+            }
+            await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
+
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+
+        private async Task<DialogTurnResult> SendMeetingInvite(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        {
+            string description = (string)stepContext.Context.TurnState["data"];
+            var tokenResponse = (TokenResponse)stepContext.Result;
+            if (tokenResponse?.Token != null)
+            {
+                var client = new SimpleGraphClient(tokenResponse.Token);
+                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
+
+                await client.SendMeetingInviteAsync(timeSuggestions[Int32.Parse(meetingDetail.TimeSlotChoice)], meetingDetail.Attendees, meetingDetail.Title, description);
+
+                await stepContext.Context.SendActivityAsync("Meeting has been scheduled. Thank you!");
+
+
+            }
+            else
+                await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
+            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+        #endregion
+        #region Table storage methods
+        public CloudTable CreateTableAsync(string tableName)
         {
             Microsoft.Azure.Cosmos.Table.CloudStorageAccount storageAccount = Microsoft.Azure.Cosmos.Table.CloudStorageAccount.Parse(
     configuration["StorageConnectionString"]);
@@ -142,7 +279,7 @@ namespace Microsoft.BotBuilderSamples
                 MeetingDetail insertedCustomer = result.Result as MeetingDetail;
 
                 // Get the request units consumed by the current operation. RequestCharge of a TableResult is only applied to Azure Cosmos DB
-             
+
 
                 return insertedCustomer;
             }
@@ -152,125 +289,6 @@ namespace Microsoft.BotBuilderSamples
                 Console.ReadLine();
                 throw;
             }
-        }
-
-        private async Task<DialogTurnResult> AskForDuration(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            string result = (string)stepContext.Context.TurnState["data"];
-
-            var tokenResponse = (TokenResponse)stepContext.Result;
-            if (tokenResponse?.Token != null)
-            {
-                var client = new SimpleGraphClient(tokenResponse.Token);
-                List<string> attendeeEmails = await client.GetAttendeesEmails(result);
-         
-                var sb = new System.Text.StringBuilder();
-                foreach (string email in attendeeEmails)
-                {
-                    sb.Append(email + ",");
-                }
-                string finalString = sb.ToString().Remove(sb.Length-1);
-                if (attendeeEmails != null)
-                {
-                    MeetingDetail meetingDetail = new MeetingDetail(userEmail);
-                    meetingDetail.Attendees = finalString;
-
-                    await InsertOrMergeEntityAsync(table, meetingDetail);
-
-                    return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("What will be duration of the meeting? (in hours)") }, cancellationToken);
-                }
-                await stepContext.Context.SendActivityAsync("Attendee not found, please type 'hi' to start again");
-            }
-
-            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
-        }
-        private async Task<DialogTurnResult> AskForTitle(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            var result = (FoundChoice)stepContext.Result;
-           
-            if (result != null)
-            {
-                MeetingDetail meetingDetail = new MeetingDetail(userEmail);
-                meetingDetail.TimeSlotChoice = result.Index.ToString();
-
-                await InsertOrMergeEntityAsync(table, meetingDetail);
-
-                return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter title of the meeting")}, cancellationToken);
-
-            }
-
-            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
-        }
-
-
-        private async Task<DialogTurnResult> ConfirmDetails(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            var result = (string)stepContext.Result;
-            if (result != null)
-            {
-                MeetingDetail meetingDetail = new MeetingDetail(userEmail);
-                meetingDetail.Duration = result;
-
-                await InsertOrMergeEntityAsync(table, meetingDetail);
-                meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
-                return await stepContext.PromptAsync(nameof(ConfirmPrompt), new PromptOptions { Prompt = MessageFactory.Text("Attendees: " + meetingDetail.Attendees + "\nDuration: " + meetingDetail.Duration)}, cancellationToken);
-            }
-
-            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
-        }
-        private async Task<DialogTurnResult> ShowMeetingTimeSuggestions(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            var tokenResponse = (TokenResponse)stepContext.Result;
-            if (tokenResponse?.Token != null)
-            {
-                // Pull in the data from the Microsoft Graph.
-                var client = new SimpleGraphClient(tokenResponse.Token);
-                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
-                if(meetingDetail == null)
-                {
-                    await stepContext.Context.SendActivityAsync("meeting details null");
-                }
-                timeSuggestions = await client.GetFindMeetingTimes(meetingDetail.Attendees, Convert.ToDouble(meetingDetail.Duration));
-                if(timeSuggestions.Count == 0)
-                {
-                    await stepContext.Context.SendActivityAsync("No appropriate meeting slot found. Please try again by typing 'hi' and change date this time");
-                    return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
-
-                }
-                var cardOptions = new List<Choice>();
-                for (int i = 0; i < timeSuggestions.Count; i++)
-                {
-                    cardOptions.Add(new Choice() { Value = timeSuggestions[i].Start.DateTime + " - " + timeSuggestions[i].End.DateTime });
-                }
-                var options = new PromptOptions()
-                {
-                    Prompt = MessageFactory.Text("These are the time suggestions"),
-                    RetryPrompt = MessageFactory.Text("Please choose an appropriate option"),
-                    Choices = cardOptions,
-                };
-
-                return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
-
-            }
-            await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
-            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
-        }
-        private async Task<DialogTurnResult> SendMeetingInvite(WaterfallStepContext stepContext, CancellationToken cancellationToken)
-        {
-            string title = (string)stepContext.Context.TurnState["data"];
-            var tokenResponse = (TokenResponse)stepContext.Result;
-            if (tokenResponse?.Token != null)
-            {
-                var client = new SimpleGraphClient(tokenResponse.Token);
-                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
-
-                await client.SendMeetingInviteAsync(timeSuggestions[Int32.Parse(meetingDetail.TimeSlotChoice)], meetingDetail.Attendees, title);
-
-                await stepContext.Context.SendActivityAsync("Meeting has been scheduled. Thank you!");
-
-
-            }
-            return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
         }
         public static async Task<MeetingDetail> RetrieveMeetingDetailsAsync(CloudTable table, string partitionKey, string rowKey)
         {
@@ -295,5 +313,6 @@ namespace Microsoft.BotBuilderSamples
                 throw;
             }
         }
+        #endregion
     }
 }

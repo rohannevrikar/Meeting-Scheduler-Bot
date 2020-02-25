@@ -18,6 +18,8 @@ namespace TeamsAuth
             RowKey = userEmail;
         }
         public string Title { get; set; }
+        public string Description { get; set; }
+
         public string TimeSlotChoice { get; set; }
 
         public string Attendees { get; set; }

@@ -28,14 +28,14 @@ namespace Microsoft.BotBuilderSamples
             _token = token;
         }
 
-        // Sends an email on the users behalf using the Microsoft Graph API
-        public async Task SendMeetingInviteAsync(TimeSlot timeSlot, string attendees, string title)
+        public async Task SendMeetingInviteAsync(TimeSlot timeSlot, string attendees, string title, string description)
         {
             var graphClient = GetAuthenticatedClient();
             List<string> attendeeEmails = await GetAttendeesEmails(attendees);
             var calendar = await graphClient.Me.Calendar.Request().GetAsync();
             var attendeeList = new List<Attendee>();
 
+         
             foreach (string email in attendeeEmails)
             {
                 attendeeList.Add(
@@ -51,7 +51,12 @@ namespace Microsoft.BotBuilderSamples
 
             var @event = new Event
             {
-                Subject = title,               
+                Subject = title,
+                Body = new ItemBody
+                {
+                    ContentType = BodyType.Html,
+                    Content = description
+                },
                 Start = new DateTimeTimeZone
                 {
                     DateTime = timeSlot.Start.DateTime,
@@ -71,7 +76,6 @@ namespace Microsoft.BotBuilderSamples
                 .AddAsync(@event);
 
         }
-        // Gets mail for the user using the Microsoft Graph API
         public async Task<List<string>> GetAttendeesEmails(string attendees)
         {
             var graphClient = GetAuthenticatedClient();
@@ -151,19 +155,13 @@ namespace Microsoft.BotBuilderSamples
             }
 
            
-        }
-       
-
-        // Get information about the user.
+        }      
         public async Task<User> GetMeAsync()
         {
             var graphClient = GetAuthenticatedClient();
             var me = await graphClient.Me.Request().GetAsync();
             return me;
-        }
-
-       
-        // Get an Authenticated Microsoft Graph client using the token issued to the user.
+        }       
         private GraphServiceClient GetAuthenticatedClient()
         {
             var graphClient = new GraphServiceClient(
