@@ -113,15 +113,41 @@ namespace Microsoft.BotBuilderSamples
             if (tokenResponse?.Token != null)
             {
                 var client = new SimpleGraphClient(tokenResponse.Token);
-                List<string> attendeeEmails = await client.GetAttendeesEmails(result);
+                string[] attendeeNames = string.Concat(result.Where(c => !char.IsWhiteSpace(c))).Split(",");
+              
+                List<string> attendeeTableStorage = new List<string>();
+                foreach (string name in attendeeNames)
+                {
+                    List<string> attendeeEmails = await client.GetAttendeeEmailFromName(name);
+                    if(attendeeEmails.Count > 1)
+                    {
+
+                        await stepContext.Context.SendActivityAsync("There are " + attendeeEmails.Count + " people whose name start with " + name + ". Please type hi to start again, and instead of first name, enter email to avoid ambiguity.");
+                        return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+
+
+                    }
+                    else if (attendeeEmails.Count == 1)
+                    {
+                        attendeeTableStorage.Add(attendeeEmails[0]);
+                    }
+                    else
+                    {
+                        await stepContext.Context.SendActivityAsync("Attendee not found, please type anything to start again");
+                        return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+                    }
+                       
+
+                }
+
 
                 var sb = new System.Text.StringBuilder();
-                foreach (string email in attendeeEmails)
+                foreach (string email in attendeeTableStorage)
                 {
                     sb.Append(email + ",");
                 }
                 string finalString = sb.ToString().Remove(sb.Length - 1);
-                if (attendeeEmails != null)
+                if (result != null)
                 {
                     MeetingDetail meetingDetail = new MeetingDetail(userEmail);
                     meetingDetail.Attendees = finalString;
@@ -130,7 +156,6 @@ namespace Microsoft.BotBuilderSamples
 
                     return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("What will be duration of the meeting? (in hours)") }, cancellationToken);
                 }
-                await stepContext.Context.SendActivityAsync("Attendee not found, please type 'hi' to start again");
             }
             await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
 

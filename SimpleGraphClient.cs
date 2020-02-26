@@ -35,7 +35,7 @@ namespace Microsoft.BotBuilderSamples
             var calendar = await graphClient.Me.Calendar.Request().GetAsync();
             var attendeeList = new List<Attendee>();
 
-         
+
             foreach (string email in attendeeEmails)
             {
                 attendeeList.Add(
@@ -67,7 +67,7 @@ namespace Microsoft.BotBuilderSamples
                     DateTime = timeSlot.End.DateTime,
                     TimeZone = TimeZoneInfo.Local.Id
                 },
-             
+
                 Attendees = attendeeList
             };
 
@@ -82,7 +82,7 @@ namespace Microsoft.BotBuilderSamples
             var users = await graphClient.Users.Request().GetAsync();
             string[] attendeeNames = string.Concat(attendees.Where(c => !char.IsWhiteSpace(c))).Split(",");
             List<string> attendeeEmails = new List<string>();
-            foreach(string name in attendeeNames)
+            foreach (string name in attendeeNames)
             {
                 try
                 {
@@ -95,6 +95,24 @@ namespace Microsoft.BotBuilderSamples
                 }
             }
             return attendeeEmails;
+        }
+        public async Task<List<string>> GetAttendeeEmailFromName(string attendee)
+        {
+            var graphClient = GetAuthenticatedClient();
+            var users = await graphClient.Users.Request().GetAsync();
+            List<string> matchingEmails = new List<string>();
+
+            try
+            {
+                matchingEmails = users.Where(a => a.DisplayName.Contains(attendee, StringComparison.OrdinalIgnoreCase) || a.UserPrincipalName.Contains(attendee, StringComparison.OrdinalIgnoreCase)).Select(a => a.UserPrincipalName).ToList();
+
+            }
+            catch (InvalidOperationException e)
+            {
+                return null;
+            }
+
+            return matchingEmails;
         }
         public async Task<List<TimeSlot>> GetFindMeetingTimes(string attendees, double duration)
         {
@@ -122,7 +140,7 @@ namespace Microsoft.BotBuilderSamples
 
                 HttpClient client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-                var body = new 
+                var body = new
                 {
                     attendeeList,
                     meetingDuration,
@@ -133,7 +151,7 @@ namespace Microsoft.BotBuilderSamples
                 response.EnsureSuccessStatusCode();
 
                 // return URI of the created resource.
-                
+
                 var meetingTimeSuggestionsResult = await response.Content.ReadAsAsync<MeetingTimeSuggestionsResult>();
                 //var meetingTimeSuggestionsResult = await graphClient.Me
                 //    .FindMeetingTimes(attendeeList, null, null, null)
@@ -149,19 +167,19 @@ namespace Microsoft.BotBuilderSamples
                 }
                 return timeSuggestions;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 throw e;
             }
 
-           
-        }      
+
+        }
         public async Task<User> GetMeAsync()
         {
             var graphClient = GetAuthenticatedClient();
             var me = await graphClient.Me.Request().GetAsync();
             return me;
-        }       
+        }
         private GraphServiceClient GetAuthenticatedClient()
         {
             var graphClient = new GraphServiceClient(
