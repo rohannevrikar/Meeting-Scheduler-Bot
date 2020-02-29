@@ -43,7 +43,7 @@ namespace Microsoft.BotBuilderSamples
             
             AddDialog(new TextPrompt(nameof(TextPrompt)));
             AddDialog(new ConfirmPrompt(nameof(ConfirmPrompt)));
-            AddDialog(new ChoicePrompt(nameof(ChoicePrompt)));
+            AddDialog(new ChoicePrompt(nameof(ChoicePrompt)){ Style = ListStyle.HeroCard });
             AddDialog(new DateTimePrompt(nameof(DateTimePrompt)));
 
             AddDialog(new WaterfallDialog(nameof(WaterfallDialog), new WaterfallStep[]
@@ -190,6 +190,7 @@ namespace Microsoft.BotBuilderSamples
                     await stepContext.Context.SendActivityAsync("meeting details null");
                 }
                 timeSuggestions = await client.GetFindMeetingTimes(meetingDetail.Attendees, Convert.ToDouble(meetingDetail.Duration));
+
                 if (timeSuggestions.Count == 0)
                 {
                     await stepContext.Context.SendActivityAsync("No appropriate meeting slot found. Please try again by typing 'hi' and change date this time");
@@ -201,15 +202,25 @@ namespace Microsoft.BotBuilderSamples
                 {
                     cardOptions.Add(new Choice() { Value = timeSuggestions[i].Start.DateTime + " - " + timeSuggestions[i].End.DateTime });
                 }
-                var options = new PromptOptions()
+                List<string> cardActions = new List<string>();
+                TimeZoneInfo zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+
+                for (int i=0;i<timeSuggestions.Count;i++)
                 {
-                    Prompt = MessageFactory.Text("These are the time suggestions"),
-                    RetryPrompt = MessageFactory.Text("Please choose an appropriate option"),
+                    cardActions.Add(TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(timeSuggestions[i].Start.DateTime), zone) + " - " + TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(timeSuggestions[i].End.DateTime), zone));
+                }
+              
+           
+
+                return await stepContext.PromptAsync(nameof(ChoicePrompt), new PromptOptions
+                {
+                    Prompt = MessageFactory.Text("These are the time suggestions. Click on the time slot for when you would the meeting to be set."),
+                    RetryPrompt = MessageFactory.Text("Sorry, Please the valid choice"),
                     Choices = cardOptions,
-                };
+                    Style = ListStyle.HeroCard,
+                }, cancellationToken);
 
-                return await stepContext.PromptAsync(nameof(ChoicePrompt), options, cancellationToken);
-
+          
             }
             await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);

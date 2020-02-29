@@ -134,7 +134,26 @@ namespace Microsoft.BotBuilderSamples
                         }
                     });
                 }
-
+                var timeConstraint = new TimeConstraint
+                {
+                    ActivityDomain = ActivityDomain.Work,
+                    TimeSlots = new List<TimeSlot>()
+                    {
+                       new TimeSlot
+                        {
+                            Start = new DateTimeTimeZone
+                            {
+                                DateTime = DateTime.Now.ToString(),
+                                TimeZone = "Pacific Standard Time"
+                            },
+                            End = new DateTimeTimeZone
+                            {
+                                DateTime = DateTime.Now.AddDays(5).ToString(),
+                                TimeZone = "Pacific Standard Time"
+                            }
+                        }
+                    }
+                };
                 var meetingDuration = new Duration(System.Xml.XmlConvert.ToString(TimeSpan.FromHours(duration)));
                 var minimumAttendeePercentage = 100;
 
