@@ -46,18 +46,18 @@ namespace Microsoft.BotBuilderSamples
             AddDialog(new ChoicePrompt(nameof(ChoicePrompt)){ Style = ListStyle.HeroCard });
             AddDialog(new DateTimePrompt(nameof(DateTimePrompt)));
 
-            AddDialog(new WaterfallDialog(nameof(WaterfallDialog), new WaterfallStep[]
+            AddDialog(new WaterfallDialog(nameof(WaterfallDialog), new WaterfallStep[] //As this is a waterfall dialog, bot will interact with user in this order
             {
-                PromptStepAsync,
-                AskForAttendees,
-                GetTokenWithTextResultAsync,
-                AskForDuration,
-                GetTokenAsync,
-                ShowMeetingTimeSuggestions,
-                AskForTitle,
-                AskForDescription,
-                GetTokenWithTextResultAsync,
-                SendMeetingInvite
+                PromptStepAsync, //Prompt user to sign in
+                AskForAttendees, //Ask user for attendees
+                GetTokenAsync, //Get token which will be used in next step to call Graph to get email of attendees and save attendees in turnState so that it can be used in next step
+                AskForDuration, //Ask user for duration of the meeting
+                GetTokenToGetMeetingTimesAsync, //Get token which will be used in next step to call Graph to get meeting times
+                ShowMeetingTimeSuggestions, //Show meeting times
+                AskForTitle, //Ask for title of the meeting
+                AskForDescription, //Ask for description of the meeting
+                GetTokenAsync, //Get token which will be used in next step to call Graph to send meeting invite and save description in turnState so that it can be used in next step
+                SendMeetingInvite //Create event 
             }));
 
             // The initial child Dialog to run.
@@ -66,13 +66,13 @@ namespace Microsoft.BotBuilderSamples
         }
 
         #region Bot flow methods
-        private async Task<DialogTurnResult> GetTokenWithTextResultAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> GetTokenAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             var result = (string)stepContext.Result;
             if (result != null)
             {
-                stepContext.Context.TurnState.Add("data", result);
-                return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
+                stepContext.Context.TurnState.Add("data", result); //acts as temporary storage for previous step's input
+                return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken); //This gets new token 
             }
             await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
@@ -82,22 +82,21 @@ namespace Microsoft.BotBuilderSamples
         private async Task<DialogTurnResult> PromptStepAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
          
-            return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
+            return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken); //Ask user to sign in if the user hasn't signed in already, or else get token
         }
         private async Task<DialogTurnResult> AskForAttendees(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            // Get the token from the previous step. Note that we could also have gotten the
-            // token directly from the prompt itself. There is an example of this in the next method.
-            var tokenResponse = (TokenResponse)stepContext.Result;
+            
+            var tokenResponse = (TokenResponse)stepContext.Result; // Get the token from the previous step.
             if (tokenResponse?.Token != null)
             {
                 // Pull in the data from the Microsoft Graph.
                 var client = new SimpleGraphClient(tokenResponse.Token);
                 var me = await client.GetMeAsync();
                 userEmail = me.UserPrincipalName;
-                table = CreateTableAsync("botdata");
+                table = CreateTableAsync("botdata"); //creates table if does not exist already
                 MeetingDetail meetingDetail = new MeetingDetail(me.UserPrincipalName);
-                await InsertOrMergeEntityAsync(table, meetingDetail);
+                await InsertOrMergeEntityAsync(table, meetingDetail); //inserts user's email in table
 
                 return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("With whom would you like to set up a meeting?") }, cancellationToken);
             }
@@ -107,19 +106,19 @@ namespace Microsoft.BotBuilderSamples
         }
         private async Task<DialogTurnResult> AskForDuration(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
-            string result = (string)stepContext.Context.TurnState["data"];
+            string result = (string)stepContext.Context.TurnState["data"]; //gets attendees' names
 
-            var tokenResponse = (TokenResponse)stepContext.Result;
+            var tokenResponse = (TokenResponse)stepContext.Result; //gets token
             if (tokenResponse?.Token != null)
             {
                 var client = new SimpleGraphClient(tokenResponse.Token);
-                string[] attendeeNames = string.Concat(result.Where(c => !char.IsWhiteSpace(c))).Split(",");
+                string[] attendeeNames = string.Concat(result.Where(c => !char.IsWhiteSpace(c))).Split(","); //splits comma separated names of attendees
               
                 List<string> attendeeTableStorage = new List<string>();
                 foreach (string name in attendeeNames)
                 {
-                    List<string> attendeeEmails = await client.GetAttendeeEmailFromName(name);
-                    if(attendeeEmails.Count > 1)
+                    List<string> attendeeEmails = await client.GetAttendeeEmailFromName(name); //gets email from attendee's name
+                    if(attendeeEmails.Count > 1) //there can be multiple people having same first name, ask user to start again and enter email instead to be more specific
                     {
 
                         await stepContext.Context.SendActivityAsync("There are " + attendeeEmails.Count + " people whose name start with " + name + ". Please type hi to start again, and instead of first name, enter email to avoid ambiguity.");
@@ -127,11 +126,11 @@ namespace Microsoft.BotBuilderSamples
 
 
                     }
-                    else if (attendeeEmails.Count == 1)
+                    else if (attendeeEmails.Count == 1)  // attendee found
                     {
                         attendeeTableStorage.Add(attendeeEmails[0]);
                     }
-                    else
+                    else //attendee not found in organization
                     {
                         await stepContext.Context.SendActivityAsync("Attendee not found, please type anything to start again");
                         return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
@@ -144,7 +143,7 @@ namespace Microsoft.BotBuilderSamples
                 var sb = new System.Text.StringBuilder();
                 foreach (string email in attendeeTableStorage)
                 {
-                    sb.Append(email + ",");
+                    sb.Append(email + ","); //converts emails to comma separated string to store in table
                 }
                 string finalString = sb.ToString().Remove(sb.Length - 1);
                 if (result != null)
@@ -152,7 +151,7 @@ namespace Microsoft.BotBuilderSamples
                     MeetingDetail meetingDetail = new MeetingDetail(userEmail);
                     meetingDetail.Attendees = finalString;
 
-                    await InsertOrMergeEntityAsync(table, meetingDetail);
+                    await InsertOrMergeEntityAsync(table, meetingDetail); //inserts attendees' emails in table
 
                     return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("What will be duration of the meeting? (in hours)") }, cancellationToken);
                 }
@@ -161,7 +160,7 @@ namespace Microsoft.BotBuilderSamples
 
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
         }
-        private async Task<DialogTurnResult> GetTokenAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
+        private async Task<DialogTurnResult> GetTokenToGetMeetingTimesAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
         {
             var result = (string)stepContext.Result;
             if (result != null)
@@ -169,8 +168,8 @@ namespace Microsoft.BotBuilderSamples
                 MeetingDetail meetingDetail = new MeetingDetail(userEmail);
                 meetingDetail.Duration = result;
 
-                await InsertOrMergeEntityAsync(table, meetingDetail);
-                return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken);
+                await InsertOrMergeEntityAsync(table, meetingDetail); //inserts duration in table
+                return await stepContext.BeginDialogAsync(nameof(OAuthPrompt), null, cancellationToken); //gets token for next step
             }
             await stepContext.Context.SendActivityAsync("Something went wrong. Please type anything to get started again.");
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
@@ -184,12 +183,9 @@ namespace Microsoft.BotBuilderSamples
             {
                 // Pull in the data from the Microsoft Graph.
                 var client = new SimpleGraphClient(tokenResponse.Token);
-                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
-                if (meetingDetail == null)
-                {
-                    await stepContext.Context.SendActivityAsync("meeting details null");
-                }
-                timeSuggestions = await client.GetFindMeetingTimes(meetingDetail.Attendees, Convert.ToDouble(meetingDetail.Duration));
+                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail); //retrives data from table
+            
+                timeSuggestions = await client.FindMeetingTimes(meetingDetail.Attendees, Convert.ToDouble(meetingDetail.Duration)); //returns meeting times
 
                 if (timeSuggestions.Count == 0)
                 {
@@ -200,16 +196,9 @@ namespace Microsoft.BotBuilderSamples
                 var cardOptions = new List<Choice>();
                 for (int i = 0; i < timeSuggestions.Count; i++)
                 {
-                    cardOptions.Add(new Choice() { Value = timeSuggestions[i].Start.DateTime + " - " + timeSuggestions[i].End.DateTime });
+                    cardOptions.Add(new Choice() { Value = timeSuggestions[i].Start.DateTime + " - " + timeSuggestions[i].End.DateTime }); //creates list of meeting time choices
                 }
-                List<string> cardActions = new List<string>();
-                TimeZoneInfo zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
-
-                for (int i=0;i<timeSuggestions.Count;i++)
-                {
-                    cardActions.Add(TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(timeSuggestions[i].Start.DateTime), zone) + " - " + TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(timeSuggestions[i].End.DateTime), zone));
-                }
-              
+ 
            
 
                 return await stepContext.PromptAsync(nameof(ChoicePrompt), new PromptOptions
@@ -217,7 +206,7 @@ namespace Microsoft.BotBuilderSamples
                     Prompt = MessageFactory.Text("These are the time suggestions. Click on the time slot for when you would the meeting to be set."),
                     RetryPrompt = MessageFactory.Text("Sorry, Please the valid choice"),
                     Choices = cardOptions,
-                    Style = ListStyle.HeroCard,
+                    Style = ListStyle.HeroCard, //displays choices as buttons
                 }, cancellationToken);
 
           
@@ -235,7 +224,7 @@ namespace Microsoft.BotBuilderSamples
                 MeetingDetail meetingDetail = new MeetingDetail(userEmail);
                 meetingDetail.TimeSlotChoice = result.Index.ToString();
 
-                await InsertOrMergeEntityAsync(table, meetingDetail);
+                await InsertOrMergeEntityAsync(table, meetingDetail); //inserts selected time slot in table
 
                 return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter title of the meeting")}, cancellationToken);
 
@@ -253,7 +242,7 @@ namespace Microsoft.BotBuilderSamples
                 MeetingDetail meetingDetail = new MeetingDetail(userEmail);
                 meetingDetail.Title = result;
 
-                await InsertOrMergeEntityAsync(table, meetingDetail);
+                await InsertOrMergeEntityAsync(table, meetingDetail); //inserts title in table
 
                 return await stepContext.PromptAsync(nameof(TextPrompt), new PromptOptions { Prompt = MessageFactory.Text("Please enter description of the meeting") }, cancellationToken);
 
@@ -270,9 +259,9 @@ namespace Microsoft.BotBuilderSamples
             if (tokenResponse?.Token != null)
             {
                 var client = new SimpleGraphClient(tokenResponse.Token);
-                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail);
+                MeetingDetail meetingDetail = await RetrieveMeetingDetailsAsync(table, userEmail, userEmail); //retrieves current meeting details
 
-                await client.SendMeetingInviteAsync(timeSuggestions[Int32.Parse(meetingDetail.TimeSlotChoice)], meetingDetail.Attendees, meetingDetail.Title, description);
+                await client.SendMeetingInviteAsync(timeSuggestions[Int32.Parse(meetingDetail.TimeSlotChoice)], meetingDetail.Attendees, meetingDetail.Title, description); //creates event 
 
                 await stepContext.Context.SendActivityAsync("Meeting has been scheduled. Thank you!");
 
@@ -312,17 +301,16 @@ namespace Microsoft.BotBuilderSamples
 
                 // Execute the operation.
                 TableResult result = await table.ExecuteAsync(insertOrMergeOperation);
-                MeetingDetail insertedCustomer = result.Result as MeetingDetail;
+                MeetingDetail meetingDetail = result.Result as MeetingDetail;
 
                 // Get the request units consumed by the current operation. RequestCharge of a TableResult is only applied to Azure Cosmos DB
 
 
-                return insertedCustomer;
+                return meetingDetail;
             }
             catch (Microsoft.Azure.Cosmos.Table.StorageException e)
             {
-                Console.WriteLine(e.Message);
-                Console.ReadLine();
+               
                 throw;
             }
         }
@@ -344,8 +332,7 @@ namespace Microsoft.BotBuilderSamples
             }
             catch (StorageException e)
             {
-                Console.WriteLine(e.Message);
-                Console.ReadLine();
+               
                 throw;
             }
         }

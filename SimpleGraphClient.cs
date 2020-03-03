@@ -80,13 +80,13 @@ namespace Microsoft.BotBuilderSamples
         {
             var graphClient = GetAuthenticatedClient();
             var users = await graphClient.Users.Request().GetAsync();
-            string[] attendeeNames = string.Concat(attendees.Where(c => !char.IsWhiteSpace(c))).Split(",");
+            string[] attendeeNamesOrEmails = string.Concat(attendees.Where(c => !char.IsWhiteSpace(c))).Split(","); //splits both comma separated names(for user input) and emails(for table data) as attendees parameter can be either names or emails
             List<string> attendeeEmails = new List<string>();
-            foreach (string name in attendeeNames)
+            foreach (string nameOrEmail in attendeeNamesOrEmails)
             {
                 try
                 {
-                    attendeeEmails.Add(users.Where(a => a.DisplayName.Contains(name, StringComparison.OrdinalIgnoreCase) || a.UserPrincipalName.Contains(name, StringComparison.OrdinalIgnoreCase)).Select(a => a.UserPrincipalName).First());
+                    attendeeEmails.Add(users.Where(a => a.DisplayName.Contains(nameOrEmail, StringComparison.OrdinalIgnoreCase) || a.UserPrincipalName.Contains(nameOrEmail, StringComparison.OrdinalIgnoreCase)).Select(a => a.UserPrincipalName).First()); //convert to list 
 
                 }
                 catch (InvalidOperationException e)
@@ -114,7 +114,7 @@ namespace Microsoft.BotBuilderSamples
 
             return matchingEmails;
         }
-        public async Task<List<TimeSlot>> GetFindMeetingTimes(string attendees, double duration)
+        public async Task<List<TimeSlot>> FindMeetingTimes(string attendees, double duration)
         {
             try
             {
@@ -149,7 +149,7 @@ namespace Microsoft.BotBuilderSamples
                             End = new DateTimeTimeZone
                             {
                                 DateTime = DateTime.Now.AddDays(5).ToString(),
-                                TimeZone = "Pacific Standard Time"
+                                TimeZone = "P Standard Time"
                             }
                         }
                     }
@@ -166,18 +166,11 @@ namespace Microsoft.BotBuilderSamples
                     minimumAttendeePercentage
                 };
                 HttpResponseMessage response = await client.PostAsJsonAsync(
-                "https://graph.microsoft.com/v1.0/me/findMeetingTimes", body);
+                "https://graph.microsoft.com/v1.0/me/findMeetingTimes", body); //call findMeetingTimes graph API
                 response.EnsureSuccessStatusCode();
 
-                // return URI of the created resource.
-
                 var meetingTimeSuggestionsResult = await response.Content.ReadAsAsync<MeetingTimeSuggestionsResult>();
-                //var meetingTimeSuggestionsResult = await graphClient.Me
-                //    .FindMeetingTimes(attendeeList, null, null, null)
-                //    .Request()
-                //    .Header("Prefer", "outlook.timezone=\"Pacific Standard Time\"")
-                //    .PostAsync();
-
+        
 
                 var timeSuggestions = new List<TimeSlot>();
                 foreach (MeetingTimeSuggestion meetingTimeSuggestion in meetingTimeSuggestionsResult.MeetingTimeSuggestions)
