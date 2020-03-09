@@ -1,0 +1,43 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.5/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.5",
+  "version": "1.0.0",
+  "id": "<<Your-bot-id>>",
+  "packageName": "com.microsoft.teams.samples",
+  "developer": {
+    "name": "Microsoft",
+    "websiteUrl": "https://example.azurewebsites.net",
+    "privacyUrl": "https://example.azurewebsites.net/privacy",
+    "termsOfUseUrl": "https://example.azurewebsites.net/termsofuse"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Meeting Bot",
+    "full": "Meeting Bot"
+  },
+  "description": {
+    "short": "Teams bot to schedule meetings",
+    "full": "Teams bot to schedule meetings"
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "<<Your-bot-id>>",
+      "scopes": [
+        "personal"
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [ "token.botframework.com" ]
+
+  
+}
