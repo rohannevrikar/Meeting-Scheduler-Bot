@@ -1,1 +1,1 @@
-﻿This bot helps to schedule meetings by suggesting suitable timings based on availibility of all attendees. Still working on this.
+This bot helps to schedule meetings by suggesting suitable timings based on availibility of all attendees. This project is built on top of https://github.com/microsoft/BotBuilder-Samples/tree/master/samples/csharp_dotnetcore/46.teams-auth. Further reading: https://rohannevrikar.wordpress.com/2020/03/10/meeting-scheduler-bot/
