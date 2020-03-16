@@ -194,7 +194,7 @@ namespace Microsoft.BotBuilderSamples
 
                 return await stepContext.PromptAsync(nameof(ChoicePrompt), new PromptOptions
                 {
-                    Prompt = MessageFactory.Text("These are the time suggestions. Click on the time slot for when you would the meeting to be set."),
+                    Prompt = MessageFactory.Text("These are the time suggestions. Click on the time slot for when you want the meeting to be set."),
                     RetryPrompt = MessageFactory.Text("Sorry, Please the valid choice"),
                     Choices = cardOptions,
                     Style = ListStyle.HeroCard, //displays choices as buttons
@@ -273,6 +273,7 @@ namespace Microsoft.BotBuilderSamples
             CloudTableClient tableClient = storageAccount.CreateCloudTableClient(new TableClientConfiguration());
 
             CloudTable table = tableClient.GetTableReference(tableName);
+            
             table.CreateIfNotExists();
             return table;
         }
